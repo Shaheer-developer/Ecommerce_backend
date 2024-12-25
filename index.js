@@ -22,7 +22,7 @@ mongoose.connect(`${process.env.MONGODB_URI}/${DBNAME}`)
 .then(() => {
     console.log('Database connected successfully');
 }).catch((err) => {
-    console.log('Error in database connection');
+    console.log('Error in database connection',err.message);
 });
 
 //API creation
@@ -127,6 +127,87 @@ app.get('/allproducts', async (req, res) => {
     console.log("All products fetched",products);
     res.send(products);
 });
+
+//Schema for user
+const userSchema = new mongoose.Schema({
+    name:{
+        type: String,
+        required: true,
+    },
+    email:{
+        type: String,
+        unique: true,
+        required: true,
+    },
+    password:{
+        type: String,
+        required: true,
+    },
+    cartData:{
+        type: Object,
+    },
+    date:{
+        type: Date,
+        default: Date.now,
+    },
+});
+const User = mongoose.model("User", userSchema);
+
+// creating endpoint for user registration
+
+app.post('/signup', async(req, res) => {
+    let check = await User.findOne({email: req.body.email});
+    if(check){
+       return  res.status(400).json({success: false, errors: "User already exists"});
+    }
+    let cart = {}
+    for(let i = 0 ; i < 300; i++){
+        cart[i]=0;
+    }
+    const user = new User({
+        name: req.body.username,
+        email:req.body.email,
+        password:req.body.password,
+        cartData: cart,
+    })
+    await user.save();
+
+    const data = {
+        user :{
+            id: user.id,
+        }
+    }
+    const token = jwt.sign(data, 'secret_ecom')
+    res.json({success: true, token});
+
+})
+
+//creating endpoint for user login
+app.post('/login', async(req, res) => {
+    const {email, password} = req.body;
+    let user = await User.findOne({email});
+    if(user){
+        const passCompare = password === user.password;
+        if(passCompare){
+            const data = {
+                user :{
+                    id: user.id,
+                }
+            }
+            const token = jwt.sign(data, 'secret_ecom')
+            res.json({success: true, token});
+    }
+    else{
+        res.json({success: false, errors: "Invalid credentials"});
+    }
+
+}
+else{
+    res.json({success: false, errors: "Invalid credentials"});
+}
+}
+)
+
 
    
 app.listen(process.env.PORT, (error) => {
